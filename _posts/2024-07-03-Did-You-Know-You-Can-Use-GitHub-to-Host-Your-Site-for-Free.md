@@ -1,7 +1,7 @@
 ---
 layout: post
-title: "Did-You-Know-You-Can-Use-GitHub-to-Host-Your-Site-for-Free"
-date: 2024-06-30
+title: "Did You Know You Can Use GitHub to Host Your Site for Free"
+date: 2024-07-03
 categories: blog
 ---
 
