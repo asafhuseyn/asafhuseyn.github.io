@@ -60,14 +60,14 @@ GitHub Pages works seamlessly with Jekyll, a Ruby-based static site generator. W
 
 ### Creating a New Page with Jekyll
 
-1. On your local machine, navigate to your repository folder:
+- On your local machine, navigate to your repository folder:
 
 ```bash
 git clone https://github.com/<username>/<username>.github.io.git
 cd <username>.github.io
 ```
 
-2. Create a new Markdown file:
+- Create a new Markdown file:
 
 ```markdown
 ---
@@ -77,7 +77,7 @@ title: "About Me"
 # Hello, I'm a developer!
 ```
 
-3. Add new blog posts to the `_posts` folder. The blog post file name format should be: `YYYY-MM-DD-title.md`.
+- Add new blog posts to the `_posts` folder. The blog post file name format should be: `YYYY-MM-DD-title.md`.
 
 Example:
 
@@ -90,7 +90,7 @@ date: 2024-07-03
 This is my first blog post!
 ```
 
-4. Push the changes to GitHub:
+- Push the changes to GitHub:
 
 ```bash
 git add .
