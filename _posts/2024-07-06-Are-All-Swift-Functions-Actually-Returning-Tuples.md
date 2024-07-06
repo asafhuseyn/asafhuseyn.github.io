@@ -19,7 +19,7 @@ categories: blog
 
 ## Introduction
 
-Swift, known for its expressive and powerful type system, continues to surprise developers with its intricate design decisions. Today, we're diving deep into a fascinating theory that could reshape our understanding of Swift's function return types: Are all Swift functions secretly returning tuples?
+Swift, known for its expressive and powerful type system, continues to surprise developers with its intricate design decisions. Today, we're diving deep into a fascinating theory that could reshape our understanding of Swift's function return types: Are all Swift functions secretly returning tuples? (Like SwiftUI does for Views)
 
 ## The Genesis of the Theory
 
