@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "Are All Swift Functions Actually Returning Tuples"
+title: "Are All Swift Functions Actually Returning Tuples?"
 date: 2024-07-06
 categories: blog
 ---
