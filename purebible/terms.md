@@ -46,8 +46,8 @@ Pure Bible is provided as it is. I take care that every text matches its source,
 
 ## Changes
 
-I may update these terms when the app changes. The new version is published on this page with a new date. Every earlier version stays visible in the page's [history on GitHub](https://github.com/asafhuseyn/asafhuseyn.github.io/commits/main/purebible/terms.md).
+I may update these terms when the app changes. The new version is published on this page with a new date.
 
 ## Contact
 
-Asaf Huseyn · [purebibleapp@icloud.com](mailto:purebibleapp@icloud.com)
+Asaf Huseyn · [asaf@asafhuseyn.com](mailto:asaf@asafhuseyn.com)

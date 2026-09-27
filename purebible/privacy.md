@@ -65,10 +65,10 @@ Depending on where you live (for example under the GDPR in the European Union an
 
 ## Changes
 
-If this policy changes, the new version is published on this page with a new date. Every earlier version stays visible in the page's [history on GitHub](https://github.com/asafhuseyn/asafhuseyn.github.io/commits/main/purebible/privacy.md).
+If this policy changes, the new version is published on this page with a new date.
 
 ## Contact
 
-Asaf Huseyn · [purebibleapp@icloud.com](mailto:purebibleapp@icloud.com)
+Asaf Huseyn · [asaf@asafhuseyn.com](mailto:asaf@asafhuseyn.com)
 
 See also the [Terms of Use](/purebible/terms/).
