@@ -27,6 +27,17 @@ url: "https://asafhuseyn.com" # the base hostname & protocol for your site, e.g.
 linkedin_username: asafhuseyn
 github_username: asafhuseyn
 
+# Pages in the top navigation. Listed explicitly so that app pages (purebible/)
+# stay out of it; these are the pages the navigation showed before.
+header_pages:
+  - about.md
+  - blog.md
+  - swift.md
+  - swiftdata.md
+  - swifttesting.md
+  - swiftui.md
+  - vapor.md
+
 # Build settings
 theme: minima
 plugins:
