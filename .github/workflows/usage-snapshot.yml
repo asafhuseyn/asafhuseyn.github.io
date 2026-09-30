@@ -1,0 +1,23 @@
+# Every 10 minutes: an encrypted Pure Bible usage snapshot for /api/purebible/usage/.
+name: Usage snapshot
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install --quiet cryptography
+      - name: Snapshot
+        env:
+          KEY_PEM: ${{ secrets.CLOUDKIT_KEY_PEM }}
+          CK_KEY_ID: ${{ secrets.CLOUDKIT_KEY_ID_PRODUCTION }}
+          USAGE_PASSPHRASE: ${{ secrets.USAGE_PASSPHRASE }}
+        run: |
+          umask 077
+          printf '%s\n' "$KEY_PEM" > "$RUNNER_TEMP/key.pem"
+          CK_KEY_PATH="$RUNNER_TEMP/key.pem" python3 tools/usage_snapshot.py
