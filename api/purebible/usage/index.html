@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PB Kullanım">
+<title>Pure Bible Kullanım</title>
+<!--
+  Pure Bible usage, read live from CloudKit (Production, public database, UsageDay).
+  The page holds no data and no secret: the API token below only identifies this page to
+  CloudKit and works only from https://asafhuseyn.com. The records are readable only by the
+  Announcer role, so nothing loads until its owner signs in with his Apple Account.
+  The figures follow Tools/usage/dashboard.py in the Pure Bible repository.
+-->
+<style>
+:root{--bg:#f6f3ec;--card:#fffdf8;--ink:#23201b;--dim:#7a7368;--line:#e4ddd0;--ret:#b9ab93;--new:#6b4fa0;--avg:#23201b;--heat:107,79,160}
+@media (prefers-color-scheme:dark){:root{--bg:#141311;--card:#1d1b18;--ink:#eee8dd;--dim:#9a9285;--line:#2e2b26;--ret:#5d554a;--new:#a58bd6;--avg:#eee8dd;--heat:165,139,214}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 ui-serif,"New York",Georgia,serif}
+main{max-width:1040px;margin:0 auto;padding:24px 16px 48px}h1{font-size:28px;margin:0}h2{font-size:18px;margin:28px 0 10px}
+h3{font-size:15px;margin:0 0 10px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline}
+.sub{color:var(--dim);margin:4px 0 16px}.dim{color:var(--dim)}.small{font-size:13px;margin:-4px 0 10px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 18px}.tabs button{border:1px solid var(--line);border-radius:999px;padding:4px 12px;cursor:pointer;background:var(--card);color:var(--ink);font:inherit;font-size:14px}
+.tabs button.on{background:var(--ink);color:var(--bg)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.stat,.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.label{color:var(--dim);font-size:13px}.value{font-size:30px;font-weight:600;margin:2px 0}.note{color:var(--dim);font-size:12px}
+.card{margin-bottom:12px}.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}.grid2 .card{margin:0}
+table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:5px 4px;border-top:1px solid var(--line);text-align:left;font-weight:normal}
+th{color:var(--dim);font-size:12px}.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.barcell{width:35%}.barcell span{display:block;height:8px;border-radius:4px;background:var(--new);opacity:.75}
+.heat{background:rgba(var(--heat),calc(var(--v)*.85))}.scroll{overflow-x:auto}.cohort td,.cohort th{text-align:center}
+.chart{width:100%;height:auto;display:block}.grid{stroke:var(--line)}.axis{fill:var(--dim);font-size:11px;font-family:-apple-system,sans-serif}
+.ret{fill:var(--ret)}.new{fill:var(--new)}.avg{fill:none;stroke:var(--avg);stroke-width:1.5}
+.legend{font-weight:normal;color:var(--dim);font-size:12px;display:flex;gap:10px;align-items:center}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:-6px}.k-ret{background:var(--ret)}.k-new{background:var(--new)}.k-avg{background:var(--avg);height:2px!important}
+.empty{padding:40px;text-align:center;color:var(--dim)}
+.auth{display:flex;gap:10px;align-items:center;margin:0 0 16px}
+#apple-sign-in-button,#apple-sign-out-button{display:inline-block}
+.bar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.refresh{border:1px solid var(--line);border-radius:999px;padding:4px 12px;background:var(--card);color:var(--ink);font:inherit;font-size:14px;cursor:pointer}
+</style>
+</head>
+<body>
+<main>
+  <div class="bar">
+    <h1>Pure Bible</h1>
+    <div class="auth"><button class="refresh" id="refresh" hidden>Yenile</button><div id="apple-sign-in-button"></div><div id="apple-sign-out-button"></div></div>
+  </div>
+  <p class="sub" id="sub">Yükleniyor…</p>
+  <div class="tabs" id="tabs"></div>
+  <div id="panes"></div>
+</main>
+<script src="https://cdn.apple-cloudkit.com/ck/2/cloudkit.js"></script>
+<script>
+"use strict";
+const API_TOKEN = "d32eaced95cfa8bb7c8cdbadc0ba88099376725a8442184490b0d944fe08aae1";
+const FIELDS = ["device","day","firstDay","country","version","build","main","reference","split",
+  "language","theme","typeface","platform","model","os","opens","seconds"];
+const CACHE_KEY = "pb-usage-cache-v1";
+
+// MARK: - CloudKit
+
+CloudKit.configure({ containers: [{
+  containerIdentifier: "iCloud.group.PureBibleContainer",
+  apiTokenAuth: { apiToken: API_TOKEN, persist: true,
+    signInButton: { id: "apple-sign-in-button", theme: "black" },
+    signOutButton: { id: "apple-sign-out-button", theme: "black" } },
+  environment: "production" }] });
+const container = CloudKit.getDefaultContainer();
+const db = container.publicCloudDatabase;
+const $ = id => document.getElementById(id);
+
+function signedOut() {
+  $("sub").textContent = "Görmek için Apple hesabınla giriş yap.";
+  $("tabs").innerHTML = ""; $("panes").innerHTML = ""; $("refresh").hidden = true;
+  container.whenUserSignsIn().then(signedIn).catch(signedOut);
+}
+function signedIn() {
+  $("refresh").hidden = false;
+  container.whenUserSignsOut().then(signedOut);
+  refresh();
+}
+container.setUpAuth().then(user => user ? signedIn() : signedOut());
+$("refresh").onclick = () => refresh();
+
+function readCache() { try { return JSON.parse(localStorage.getItem(CACHE_KEY)) || {}; } catch (e) { return {}; } }
+function writeCache(c) { try { localStorage.setItem(CACHE_KEY, JSON.stringify(c)); } catch (e) {} }
+
+/** Every UsageDay filed on or after `since` (all when null). CloudKit refuses range
+    comparisons on a STRING field, so recent days are listed with IN. */
+async function fetchRows(since) {
+  const query = { recordType: "UsageDay" };
+  if (since) {
+    const days = [], end = todayNum() + 1;
+    for (let n = dnum(since); n <= end; n++) days.push(dstr(n));
+    query.filterBy = [{ fieldName: "day", comparator: "IN", fieldValue: { value: days, type: "STRING_LIST" } }];
+  }
+  const out = [];
+  let response = await db.performQuery(query, { resultsLimit: 200 });
+  for (;;) {
+    if (response.hasErrors) throw response.errors[0];
+    for (const record of response.records) {
+      const row = {};
+      for (const k of FIELDS) row[k] = record.fields[k] ? record.fields[k].value : null;
+      row.person = (record.created && record.created.userRecordName) || "";
+      out.push([record.recordName, row]);
+    }
+    if (!response.moreComing) return out;
+    response = await db.performQuery(response);
+  }
+}
+
+async function refresh() {
+  $("sub").textContent = "CloudKit'ten okunuyor…";
+  try {
+    const cache = readCache();
+    const days = Object.values(cache).map(r => r.day).filter(Boolean).sort();
+    const since = days.length ? dstr(dnum(days[days.length - 1]) - 2) : null;
+    for (const [name, row] of await fetchRows(since)) cache[name] = row;
+    writeCache(cache);
+    render(Object.values(cache).filter(r => r.device && r.day));
+  } catch (error) {
+    const reason = (error && (error.reason || error.serverErrorCode || error.message)) || String(error);
+    $("sub").textContent = "Okunamadı: " + reason;
+  }
+}
+
+// MARK: - Days (UTC, as the app files them)
+
+const DAY = 864e5;
+function dnum(s) { const [y, m, d] = s.split("-").map(Number); return Date.UTC(y, m - 1, d) / DAY; }
+function dstr(n) { return new Date(n * DAY).toISOString().slice(0, 10); }
+function todayNum() { return Math.floor(Date.now() / DAY); }
+function ddmm(n) { const s = dstr(n); return s.slice(8, 10) + "." + s.slice(5, 7); }
+
+// MARK: - Figures
+
+class Figures {
+  constructor(rows, today) {
+    this.rows = rows; this.today = today;
+    this.byDay = new Map(); this.peopleByDay = new Map(); this.daysOf = new Map();
+    this.first = new Map(); this.latest = new Map(); this.minutes = []; this.opens = [];
+    const add = (map, k, v) => { if (!map.has(k)) map.set(k, new Set()); map.get(k).add(v); };
+    for (const r of rows) {
+      const d = dnum(r.day);
+      add(this.byDay, d, r.device);
+      if (r.person) add(this.peopleByDay, d, r.person);
+      add(this.daysOf, r.device, d);
+      const first = r.firstDay ? dnum(r.firstDay) : d;
+      this.first.set(r.device, Math.min(this.first.has(r.device) ? this.first.get(r.device) : first, first, d));
+      if (!this.latest.has(r.device) || r.day > this.latest.get(r.device).day) this.latest.set(r.device, r);
+      this.minutes.push((r.seconds || 0) / 60);
+      this.opens.push(r.opens || 0);
+    }
+  }
+  active(days, people = false) {
+    const start = this.today - days + 1, seen = new Set();
+    for (const [d, v] of (people ? this.peopleByDay : this.byDay)) if (d >= start && d <= this.today) v.forEach(x => seen.add(x));
+    return seen.size;
+  }
+  newCount(days) {
+    const start = this.today - days + 1;
+    let n = 0; for (const f of this.first.values()) if (f >= start && f <= this.today) n++;
+    return n;
+  }
+  stickiness() {
+    const mau = this.active(30); if (!mau) return null;
+    let sum = 0; for (let i = 0; i < 30; i++) sum += (this.byDay.get(this.today - i) || new Set()).size;
+    return sum / 30 / mau;
+  }
+  retention(n) {
+    const cohort = [...this.first].filter(([, f]) => f <= this.today - n).map(([dev]) => dev);
+    if (!cohort.length) return [null, 0];
+    const kept = cohort.filter(dev => [...this.daysOf.get(dev)].some(d => d >= this.first.get(dev) + n)).length;
+    return [kept / cohort.length, cohort.length];
+  }
+  cohorts(weeks = 8) {
+    const weekday = (new Date(this.today * DAY).getUTCDay() + 6) % 7, monday = this.today - weekday, table = [];
+    for (let w = weeks - 1; w >= 0; w--) {
+      const start = monday - 7 * w;
+      const members = [...this.first].filter(([, f]) => f >= start && f < start + 7).map(([dev]) => dev);
+      const cells = [];
+      for (let later = 1; later <= w; later++) {
+        const s = start + 7 * later;
+        const back = members.filter(dev => [...this.daysOf.get(dev)].some(d => d >= s && d < s + 7)).length;
+        cells.push(members.length ? back / members.length : null);
+      }
+      table.push([start, members.length, cells]);
+    }
+    return table;
+  }
+  breakdown(field, days = 30, transform = null) {
+    const start = this.today - days + 1, counts = new Map();
+    for (const [dev, r] of this.latest) {
+      if (Math.max(...this.daysOf.get(dev)) >= start) {
+        let v = r[field]; v = transform ? transform(v) : v;
+        const key = (v === null || v === undefined || v === "") ? "—" : v;
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+    }
+    return [...counts].sort((a, b) => b[1] - a[1]);
+  }
+  median(values) { const v = values.filter(x => x).sort((a, b) => a - b); return v.length ? v[Math.floor(v.length / 2)] : 0; }
+}
+
+// MARK: - Page
+
+const COUNTRY_NAMES = {US:"ABD",GB:"Birleşik Krallık",IE:"İrlanda",CA:"Kanada",AU:"Avustralya",NZ:"Yeni Zelanda",FR:"Fransa",BE:"Belçika",CH:"İsviçre",IT:"İtalya",ES:"İspanya",PT:"Portekiz",DE:"Almanya",AT:"Avusturya",NL:"Hollanda",PL:"Polonya",PH:"Filipinler",IN:"Hindistan",NG:"Nijerya",KE:"Kenya",GH:"Gana",ZA:"Güney Afrika",BR:"Brezilya",MX:"Meksika",AR:"Arjantin",CO:"Kolombiya",CL:"Şili",PE:"Peru",JP:"Japonya",KR:"Güney Kore",CN:"Çin",TW:"Tayvan",HK:"Hong Kong",SG:"Singapur",VA:"Vatikan",MT:"Malta",TR:"Türkiye",AZ:"Azerbaycan",GE:"Gürcistan",RU:"Rusya",UA:"Ukrayna",LB:"Lübnan",AE:"BAE",SA:"Suudi Arabistan",HR:"Hırvatistan",HU:"Macaristan",CZ:"Çekya",SK:"Slovakya",SE:"İsveç",NO:"Norveç",DK:"Danimarka",FI:"Finlandiya",LT:"Litvanya",SI:"Slovenya",RO:"Romanya",VN:"Vietnam",ID:"Endonezya",MY:"Malezya",TH:"Tayland"};
+const ALPHA3 = {USA:"US",GBR:"GB",IRL:"IE",CAN:"CA",AUS:"AU",NZL:"NZ",FRA:"FR",BEL:"BE",CHE:"CH",ITA:"IT",ESP:"ES",PRT:"PT",DEU:"DE",AUT:"AT",NLD:"NL",POL:"PL",PHL:"PH",IND:"IN",NGA:"NG",KEN:"KE",GHA:"GH",ZAF:"ZA",BRA:"BR",MEX:"MX",ARG:"AR",COL:"CO",CHL:"CL",PER:"PE",JPN:"JP",KOR:"KR",CHN:"CN",TWN:"TW",HKG:"HK",SGP:"SG",VAT:"VA",MLT:"MT",TUR:"TR",AZE:"AZ",GEO:"GE",RUS:"RU",UKR:"UA",LBN:"LB",ARE:"AE",SAU:"SA",HRV:"HR",HUN:"HU",CZE:"CZ",SVK:"SK",SWE:"SE",NOR:"NO",DNK:"DK",FIN:"FI",LTU:"LT",SVN:"SI",ROU:"RO",VNM:"VN",IDN:"ID",MYS:"MY",THA:"TH"};
+const TRANSLATION_NAMES = {DRA:"Douay-Rheims",CPDV:"Catholic Public Domain",VULC:"Vulgata Clementina",GLAIRE:"Glaire",CRAMPON:"Crampon",RAGUET:"Raguet (Japonca)",AZB:"Azərbaycan"};
+const NAMES = {English:"İngilizce",Latin:"Latince",French:"Fransızca",Italian:"İtalyanca",Japanese:"Japonca",Azerbaijani:"Azerbaycanca",Automatic:"Otomatik",Light:"Açık",Dark:"Koyu",Paper:"Kâğıt",Night:"Gece",Classic:"Klasik",Contemporary:"Çağdaş"};
+
+function countryLabel(code) {
+  code = String(code || "").toUpperCase();
+  if (code.length === 3) code = ALPHA3[code] || code;
+  if (code.length !== 2) return code || "—";
+  const flag = String.fromCodePoint(...[...code].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+  return flag + " " + (COUNTRY_NAMES[code] || code);
+}
+const pct = v => v === null || v === undefined ? "—" : Math.round(v * 100) + "%";
+const esc = v => String(v).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function dailyChart(fig, days = 90) {
+  const start = fig.today - days + 1, series = [];
+  for (let i = 0; i < days; i++) {
+    const d = start + i, devices = fig.byDay.get(d) || new Set();
+    let n = 0; devices.forEach(dev => { if (fig.first.get(dev) === d) n++; });
+    series.push([d, devices.size, n]);
+  }
+  const top = Math.max(1, ...series.map(s => s[1])), w = 900, h = 220, pad = 28, bar = (w - pad) / days;
+  const parts = [`<svg viewBox="0 0 ${w} ${h + 24}" class="chart" role="img" aria-label="Günlük aktif cihaz">`];
+  for (const frac of [0.5, 1]) {
+    const y = h - (h - 10) * frac;
+    parts.push(`<line x1="${pad}" x2="${w}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" class="grid"/><text x="${pad - 6}" y="${(y + 4).toFixed(1)}" class="axis" text-anchor="end">${Math.round(top * frac)}</text>`);
+  }
+  const points = [];
+  series.forEach(([d, total, n], i) => {
+    const x = pad + i * bar, th = (h - 10) * total / top, nh = (h - 10) * n / top, bw = Math.max(bar - 1.5, 1).toFixed(1);
+    parts.push(`<g><title>${dstr(d)}: ${total} aktif, ${n} yeni</title><rect x="${(x + 0.5).toFixed(1)}" y="${(h - th).toFixed(1)}" width="${bw}" height="${(th - nh).toFixed(1)}" class="ret"/><rect x="${(x + 0.5).toFixed(1)}" y="${(h - nh).toFixed(1)}" width="${bw}" height="${nh.toFixed(1)}" class="new"/></g>`);
+    const win = series.slice(Math.max(0, i - 6), i + 1).map(s => s[1]);
+    points.push(`${(x + bar / 2).toFixed(1)},${(h - (h - 10) * (win.reduce((a, b) => a + b, 0) / win.length) / top).toFixed(1)}`);
+    const dom = Number(dstr(d).slice(8, 10));
+    if (dom === 1 || (i === 0 && dom < 25)) parts.push(`<text x="${x.toFixed(1)}" y="${h + 18}" class="axis">${ddmm(d)}</text>`);
+  });
+  parts.push(`<polyline points="${points.join(" ")}" class="avg"/></svg>`);
+  return parts.join("");
+}
+
+function table(title, rows, total, label = String, limit = 12) {
+  if (!rows.length) return "";
+  const body = rows.slice(0, limit).map(([value, count]) => {
+    const share = total ? count / total : 0;
+    return `<tr><td>${esc(label(value))}</td><td class="num">${count}</td><td class="barcell"><span style="width:${(share * 100).toFixed(1)}%"></span></td><td class="num dim">${pct(share)}</td></tr>`;
+  });
+  const rest = rows.slice(limit).reduce((a, [, c]) => a + c, 0);
+  if (rest) body.push(`<tr><td class="dim">Diğer (${rows.length - limit})</td><td class="num">${rest}</td><td></td><td class="num dim">${pct(rest / total)}</td></tr>`);
+  return `<section class="card"><h3>${esc(title)}</h3><table>${body.join("")}</table></section>`;
+}
+
+function view(fig) {
+  const mau = fig.active(30), people = new Set(fig.rows.filter(r => r.person).map(r => r.person)).size;
+  const cards = [
+    ["Bugün aktif", fig.active(1), `${fig.active(1, true)} kişi`],
+    ["Son 7 gün", fig.active(7), `${fig.active(7, true)} kişi`],
+    ["Son 30 gün", mau, `${fig.active(30, true)} kişi`],
+    ["Tüm zamanlar", fig.first.size, `${people} kişi`],
+    ["Yeni (7 gün)", fig.newCount(7), `${fig.newCount(30)} son 30 günde`],
+    ["Bağlılık", pct(fig.stickiness()), "günlük / aylık aktif"],
+    ["Günlük okuma", `${Math.round(fig.median(fig.minutes))} dk`, "aktif günde medyan"],
+    ["Günlük açılış", `${Math.round(fig.median(fig.opens))}`, "aktif günde medyan"],
+  ];
+  const out = ['<div class="cards">'];
+  for (const [t, v, n] of cards) out.push(`<div class="stat"><div class="label">${esc(t)}</div><div class="value">${esc(v)}</div><div class="note">${esc(n)}</div></div>`);
+  out.push("</div>");
+  out.push('<section class="card wide"><h3>Günlük aktif cihaz <span class="legend"><i class="k-ret"></i>geri dönen <i class="k-new"></i>ilk gün <i class="k-avg"></i>7 günlük ortalama</span></h3>' + dailyChart(fig) + "</section>");
+  const ret = [["1 gün sonra", ...fig.retention(1)], ["7 gün sonra", ...fig.retention(7)], ["30 gün sonra", ...fig.retention(30)]];
+  out.push(`<section class="card"><h3>Geri gelenler</h3><p class="dim small">İlk açtıktan en az bu kadar gün sonra uygulamayı yeniden açanların payı.</p><table>${ret.map(([t, v, n]) => `<tr><td>${t}</td><td class="num">${pct(v)}</td><td class="num dim">${n} cihaz içinden</td></tr>`).join("")}</table></section>`);
+  const cohortRows = fig.cohorts().map(([start, size, cells]) => `<tr><td>${ddmm(start)}</td><td class="num">${size}</td>${cells.map(c => `<td class="num heat" style="--v:${(c || 0).toFixed(2)}">${pct(c)}</td>`).join("")}</tr>`);
+  const heads = [1, 2, 3, 4, 5, 6, 7].map(i => `<th>${i}. hf</th>`).join("");
+  out.push(`<section class="card"><h3>Haftalık gruplar</h3><p class="dim small">İlk açtığı haftaya göre cihazlar ve sonraki her hafta aktif olanların payı.</p><div class="scroll"><table class="cohort"><tr><th>Hafta</th><th>Cihaz</th>${heads}</tr>${cohortRows.join("")}</table></div></section>`);
+  out.push('<h2>Son 30 günün aktif cihazları</h2><div class="grid2">');
+  const tr = v => TRANSLATION_NAMES[v] || v, named = v => NAMES[v] || v;
+  out.push(table("Ülke", fig.breakdown("country"), mau, countryLabel, 20));
+  out.push(table("Ana çeviri", fig.breakdown("main"), mau, tr));
+  out.push(table("Karşılaştırma çevirisi", fig.breakdown("reference"), mau, tr));
+  out.push(table("Bölünmüş ekran", fig.breakdown("split", 30, v => v ? "Açık" : "Kapalı"), mau));
+  out.push(table("Arayüz dili", fig.breakdown("language"), mau, named));
+  out.push(table("Tema", fig.breakdown("theme"), mau, named));
+  out.push(table("Yazı tipi", fig.breakdown("typeface"), mau, named));
+  out.push(table("Cihaz", fig.breakdown("platform"), mau));
+  out.push(table("Donanım modeli", fig.breakdown("model"), mau));
+  out.push(table("iOS", fig.breakdown("os", 30, v => String(v || "").split(".")[0] || null), mau));
+  out.push(table("Uygulama sürümü", fig.breakdown("version"), mau));
+  out.push("</div>");
+  return out.join("");
+}
+
+let current = "all";
+function render(rows) {
+  const today = todayNum();
+  const stamp = new Date().toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  $("sub").textContent = `Kullanım · ${stamp} · canlı · günler UTC · cihaz = kurulum, kişi = Apple hesabı`;
+  if (!rows.length) { $("tabs").innerHTML = ""; $("panes").innerHTML = '<div class="empty">Henüz kayıt yok.</div>'; return; }
+  const countries = new Figures(rows, today).breakdown("country", 3650).map(([c]) => c).filter(c => c !== "—");
+  const tabs = [["all", "Hepsi", rows], ...countries.map(code => [code, countryLabel(code), rows.filter(r => (r.country || "—") === code)])];
+  if (!tabs.some(t => t[0] === current)) current = "all";
+  $("tabs").innerHTML = tabs.length > 2 ? tabs.map(([k, t]) => `<button data-k="${esc(k)}" class="${k === current ? "on" : ""}">${esc(t)}</button>`).join("") : "";
+  const show = () => { const t = tabs.find(x => x[0] === current); $("panes").innerHTML = view(new Figures(t[2], today)); };
+  $("tabs").querySelectorAll("button").forEach(b => b.onclick = () => {
+    current = b.dataset.k; $("tabs").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); show();
+  });
+  show();
+}
+</script>
+</body>
+</html>
