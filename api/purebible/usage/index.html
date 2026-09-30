@@ -68,7 +68,7 @@ const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { ret
 
 async function open(pass) {
   $("sub").textContent = "Okunuyor…";
-  const reply = await fetch(RECORD_URL, { method: "POST", headers: { "Content-Type": "application/json" },
+  const reply = await fetch(RECORD_URL, { method: "POST", headers: { "Content-Type": "text/plain" },
     body: JSON.stringify({ records: [{ recordName: "usageSnapshot" }] }) }).then(r => r.json());
   const record = reply.records && reply.records[0];
   if (!record || !record.fields) throw new Error((record && record.reason) || "kayıt yok");
