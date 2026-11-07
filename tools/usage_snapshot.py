@@ -41,9 +41,20 @@ def newer(a, b):
     return pa > pb
 
 
-def main():
+# Last confirmed by successful snapshot run 39446121576 on 2026-10-20.
+LAST_CONFIRMED_VERSION = "2.0.2"
+
+
+def store_version():
     store = json.load(urllib.request.urlopen("https://itunes.apple.com/lookup?id=6467870565&country=us", timeout=30))
-    live = store["results"][0]["version"]
+    if store["results"] == []:
+        print(f"US App Store lookup returned no listing; filtering with last confirmed version {LAST_CONFIRMED_VERSION}")
+        return LAST_CONFIRMED_VERSION
+    return store["results"][0]["version"]
+
+
+def main():
+    live = store_version()
     rows, marker = [], None
     while True:
         body = {"query": {"recordType": "UsageDay"}, "resultsLimit": 200}
